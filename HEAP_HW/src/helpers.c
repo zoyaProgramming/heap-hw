@@ -110,6 +110,10 @@ void * sf_mem_grow_safe(){
     return coalesce(hdrp);
 }
 
+/**
+ * @brief: initialize a heap. with a prologue, one page of memory, and an epilogue.
+ * @return: pointer to the first allocated block in memory
+ */
 void * mem_init(){
     void * heap_start = sf_mem_grow();
     void * heap_end = sf_mem_end();
@@ -132,12 +136,19 @@ void * mem_init(){
     
     header_t block_hdr = parse_header(*(uint64_t * )(prologue + prologue_hdr.block_size));
     void * blockp = FTRP(prologue) + ALIGNMENT_SIZE; /*ptr to start of empty block*/
+
     block_hdr.block_size = (void*)(HDRP(heap_end)) - blockp;       /*subtract prologue and extra space*/
     block_hdr.payload_size = block_hdr.block_size - ALIGNMENT_SIZE; /*subtract alignment size */
     block_hdr.in_qklst = 0;
     block_hdr.alloc = 0;
     write_hdr(blockp, block_hdr);      /*write the empty block header*/
-    write_hdr(FTRP(blockp), block_hdr);
+    write_hdr(FTRP(blockp), block_hdr); /* write*/
+
+    // initialize epilogue
+    void * epilogue = FTRP(blockp) + RSIZE; /*skip past footer of empty*/
+    PUT_ALLOC(epilogue, 1);
+    PUT_QLIST(epilogue, 0);
+    return blockp;
 
 }
 

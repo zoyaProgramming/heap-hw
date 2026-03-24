@@ -18,19 +18,23 @@ void *sf_malloc(size_t size) {
     // ignore spurious requests
     if(size == 0) return NULL;
 
-    allocated_size  = sf_mem_end() - sf_mem_start();
     /* adjust block size to include overhead and alignment reqs.*/
     if(size <= ALIGNMENT_SIZE)// 
         asize = MIN_BLOCK_SIZE; 
     else 
         asize = ALIGNMENT_SIZE * ((size + ALIGNMENT_SIZE + (ALIGNMENT_SIZE - 1)) / ALIGNMENT_SIZE);
    
+    /*initialize heap if not initialized already*/
+    if(sf_mem_end() - sf_mem_start() < 32){
+        mem_init();
+    }
+
     /*search the free list for a fit*/
     if(blockp = find_fit(asize) != NULL){
-        place(blockp, asize);
+      //  place(blockp, asize);
         return blockp;
     }
-    size_t size = 0L;
+    size_t sizecurr = 0L;
     /*if no fit found, try to grow heap */
     extendsize = (asize >= PAGE_SZ)? asize: PAGE_SZ;
     do{
@@ -39,7 +43,7 @@ void *sf_malloc(size_t size) {
         }
         size += PAGE_SZ;
     } while(size < extendsize);
-    place(blockp, asize);
+    //place(blockp, asize);
     
     abort();
 }

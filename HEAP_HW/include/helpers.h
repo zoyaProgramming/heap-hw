@@ -1,13 +1,14 @@
 /**
  * All helper functions
  */
-#ifndef HELPERS.h
-#define HELPERS.h
+#include "sfmm.h"
+#ifndef HELPERS_H
+#define HELPERS_H
 #define ALIGNMENT_SIZE 16   /*1 row: alignment of payload*/
 #define RSIZE 8             /* row size in bytes = 2 * 4*/
 #define WSIZE 2             /*1 word in bytes*/
 #define MIN_BLOCK_SIZE 32   /* 1 row header, 1 row */
-#include "sfmm.h"
+
 
 #define MAX(x, y) ((x) > (y)? (x) : (y))
 
@@ -18,18 +19,31 @@
 #define GET(p) (*(uint64_t * )(p))
 #define PUT(p, val) (*(uint64_t *)(p) = (val))
 
+/**Create a bitmask with LEN 1s, starting OFF bits from the right */
+#define BITMASK(off, len)((((0x1UL << len) - 1) << off))
+
 /*helpers to get payload size or block size*/
 #define GET_PSIZE(p) (GET(p) & ~0xFFFFFFFF)
 #define GET_BSIZE(p) (GET(p) &  0xFFFFFFF0)
 #define GET_ALLOC(p) (GET(p) & 0x1)
+
+/**helpers to put byte / payload size */
+/**put the payload size into 64-bit value at ptr  */
+#define PUT_PSIZE(ptr, psize)(PUT(ptr, (GET(ptr) & ~(BITMASK(32, 32))) | ((uint64_t) (psize) << 32)))
+/**put the byte size into the 64-bit value at ptr */
+#define PUT_BSIZE(ptr, bsize)(PUT(ptr, (GET(ptr) & ~(BITMASK(4, 28))) | (bsize << 4)))
+#define PUT_QLIST(ptr, bit)(PUT(ptr, (GET(ptr) & ~(BITMASK(1, 1)) | (bit << 1))) )
+#define PUT_ALLOC(ptr, bit)(PUT(ptr, (GET(ptr) & ~(BITMASK(0, 1)) | bit)) )
+
+
 
 /*given a block ptr blockp, compute address of hdr and footr*/
 #define HDRP(blockp)    ((char*)(blockp) - RSIZE)
 #define FTRP(blockp)    ((char*)(blockp) + GET_BSIZE(HDRP(blockp)) - ALIGNMENT_SIZE)
 
 /*given a block ptr blockp, compute address of next and prev blocks*/
-#define NEXT_BLKP(blockp)((uint64_t*)(blockp) + GET_BSIZE((char*)(blockp) - RSIZE))
-#define PREV_BLKP(blockp)((uint64_t*)(blockp) - GET_BSIZE((char*)(blockp) - ALIGNMENT_SIZE))
+#define NEXT_BLKP(blockp)((char*)(blockp) + GET_BSIZE((char*)(blockp) - RSIZE))
+#define PREV_BLKP(blockp)((char*)(blockp) - GET_BSIZE((char*)(blockp) - ALIGNMENT_SIZE))
 
 
 /*
@@ -79,15 +93,25 @@ sf_block * find_fit(size_t size);
 
 
 /**
- * Initialize the memory with one page 
+ * Initialize the memory with one page. Create 32-bit prologue and 8-bit epilogue
+ * @return: pointer to the first block of the allocated memory
  */
 void * mem_init();
 
 /**
  * grow memory and coalesce with the preceding block
- * 
+ * @return ptr to the coalesced block
  */
-void * coalesce();
+void * coalesce(sf_block* blockp);
 
+/**
+ * @brief: given a pointer to valid memory of the desired size,
+ *          set the hdr and footer of the memory block, and return a ptr to the block.
+ *          If there is enough space to split the block into 2 blocks, do so and add padding.
+ *          Also remove the block from the free list, and quick list if applicable.
+ * @param ptr: ptr to the location in memory
+ * @param size: size of the block, including padding, header, footer, size >= 32 bytes
+ */
+void * place(void * ptr, size_t size);
 
 #endif
