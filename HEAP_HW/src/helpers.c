@@ -1,4 +1,5 @@
 #include "helpers.h"
+#include "assert.h"
 #include "sfmm.h"
 
 
@@ -110,12 +111,34 @@ void * sf_mem_grow_safe(){
 }
 
 void * mem_init(){
-    char * p = (char*) sf_mem_grow();
-    if(!p) return NULL;
-    header_t hdr = parse_header(*(uint64_t * )(p + RSIZE));
-    hdr.alloc =0;
-    hdr.in_qklst =0;
-    write_hdr(p + RSIZE, hdr);
+    void * heap_start = sf_mem_grow();
+    void * heap_end = sf_mem_end();
+    if(!heap_start ) return NULL;
+
+    /*DEBUG*/
+    assert((sf_mem_end() - heap_start ) >= 32);
+    /*END DEBUG*/
+
+    void * prologue = heap_start + RSIZE; /*increase by 8 :*/
+    // initialize prologue header
+    header_t prologue_hdr = parse_header(*(uint64_t * )(prologue + RSIZE));
+    prologue_hdr.alloc =0;
+    prologue_hdr.in_qklst = 0;
+    prologue_hdr.block_size = MIN_BLOCK_SIZE;
+    write_hdr(prologue + RSIZE, prologue_hdr);         /*write prologue header*/
+    write_hdr(FTRP(prologue), prologue_hdr);           /*write prologue footer*/
+
+    // initialize empty block
+    
+    header_t block_hdr = parse_header(*(uint64_t * )(prologue + prologue_hdr.block_size));
+    void * blockp = FTRP(prologue) + ALIGNMENT_SIZE; /*ptr to start of empty block*/
+    block_hdr.block_size = (void*)(HDRP(heap_end)) - blockp;       /*subtract prologue and extra space*/
+    block_hdr.payload_size = block_hdr.block_size - ALIGNMENT_SIZE; /*subtract alignment size */
+    block_hdr.in_qklst = 0;
+    block_hdr.alloc = 0;
+    write_hdr(blockp, block_hdr);      /*write the empty block header*/
+    write_hdr(FTRP(blockp), block_hdr);
+
 }
 
 void * coalesce(sf_block * blockp){
