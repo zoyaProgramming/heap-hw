@@ -50,8 +50,8 @@
     |                                Pointer to next free block                               |
     |                                        (1 row)                                          |
     +-----------------------------------------------------------------------------------------+
-    |                                                                                         | 
-    |                                         Unused                                          | 
+    |                                                                                         |
+    |                                         Unused                                          |
     |                                        (N rows)                                         |
     |                                                                                         |
     +-------------------------------------+----------------------+--------+---------+---------+ <- footer
@@ -78,8 +78,8 @@
     |                               Pointer to previous free block                            |
     |                                        (1 row)                                          |
     +-----------------------------------------------------------------------------------------+
-    |                                                                                         | 
-    |                                         Unused                                          | 
+    |                                                                                         |
+    |                                         Unused                                          |
     |                                        (N rows)                                         |
     |                                                                                         |
     |                                                                                         |
@@ -96,8 +96,8 @@
 
 #define MAGIC (sf_magic())
 
-#define THIS_BLOCK_ALLOCATED  0x1
-#define IN_QUICK_LIST         0x2
+#define THIS_BLOCK_ALLOCATED 0x1
+#define IN_QUICK_LIST 0x2
 
 typedef size_t sf_header;
 typedef size_t sf_footer;
@@ -105,16 +105,19 @@ typedef size_t sf_footer;
 /*
  * Structure of a block.
  */
-typedef struct sf_block {
+typedef struct sf_block
+{
     sf_header header;
-    union {
+    union
+    {
         /* A free block contains links to other blocks in a free list. */
-        struct {
+        struct
+        {
             struct sf_block *next;
             struct sf_block *prev;
         } links;
         /* An allocated block contains a payload (aligned), starting here. */
-        char payload[0];   // Length varies according to block size.
+        char payload[0]; // Length varies according to block size.
     } body;
 } sf_block;
 
@@ -195,10 +198,11 @@ int sf_errno;
  * They are maintained as singly linked lists, using a LIFO discipline.
  */
 
-#define NUM_QUICK_LISTS 12  /* Number of quick lists. */
-#define QUICK_LIST_MAX   5  /* Maximum number of blocks permitted on a single quick list. */
+#define NUM_QUICK_LISTS 12 /* Number of quick lists. */
+#define QUICK_LIST_MAX 5   /* Maximum number of blocks permitted on a single quick list. */
 
-struct {
+struct
+{
     int length;             // Number of blocks currently in the list.
     struct sf_block *first; // Pointer to first block in the list.
 } sf_quick_lists[NUM_QUICK_LISTS];
@@ -284,7 +288,6 @@ double sf_fragmentation();
  * this function should return 0.0.
  */
 double sf_utilization();
-
 
 /* sfutil.c: Helper functions already created for this assignment. */
 

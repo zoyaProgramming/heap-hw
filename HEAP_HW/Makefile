@@ -1,3 +1,12 @@
+CPU := $(shell uname -p)
+ifeq ($(CPU),arm)
+export LD_LIBRARY_PATH=/opt/homebrew/lib/:$LD_LIBRARY_PATH
+INCD = -I /opt/homebrew/include/
+LIBD = -L /opt/homebrew/lib/
+endif
+
+
+
 CC := gcc
 SRCD := src
 TSTD := tests
