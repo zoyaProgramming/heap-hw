@@ -32,8 +32,8 @@
 #define PUT_PSIZE(ptr, psize)(PUT(ptr, (GET(ptr) & ~(BITMASK(32, 32))) | ((uint64_t) (psize) << 32)))
 /**put the byte size into the 64-bit value at ptr */
 #define PUT_BSIZE(ptr, bsize)(PUT(ptr, (GET(ptr) & ~(BITMASK(4, 28))) | (bsize << 4)))
-#define PUT_QLIST(ptr, bit)(PUT(ptr, (GET(ptr) & ~(BITMASK(1, 1)) | (bit << 1))) )
-#define PUT_ALLOC(ptr, bit)(PUT(ptr, (GET(ptr) & ~(BITMASK(0, 1)) | bit)) )
+#define PUT_QLIST(ptr, bit)(PUT(ptr, ((GET(ptr) & ~(BITMASK(1, 1))) | (bit << 1))) )
+#define PUT_ALLOC(ptr, bit)(PUT(ptr, ((GET(ptr) & ~(BITMASK(0, 1))) | (bit))) )
 
 
 
@@ -102,16 +102,18 @@ void * mem_init();
  * grow memory and coalesce with the preceding block
  * @return ptr to the coalesced block
  */
-void * coalesce(sf_block* blockp);
+void * coalesce(void* blockp);
 
 /**
- * @brief: given a pointer to valid memory of the desired size,
+ * @brief given a pointer to valid memory of the desired size,
  *          set the hdr and footer of the memory block, and return a ptr to the block.
+ * 
  *          If there is enough space to split the block into 2 blocks, do so and add padding.
  *          Also remove the block from the free list, and quick list if applicable.
- * @param ptr: ptr to the location in memory
- * @param size: size of the block, including padding, header, footer, size >= 32 bytes
+ * @param ptr ptr to the location in memory
+ * @param asize size of the block, including padding, header, footer, size >= 32 bytes
+ * @param size  size of the payload (user input provided)
  */
-void * place(void * ptr, size_t size);
+void * place(void * ptr, size_t asize, size_t size);
 
 #endif

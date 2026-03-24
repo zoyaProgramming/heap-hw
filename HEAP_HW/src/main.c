@@ -10,5 +10,7 @@ int main(int argc, char const *argv[]) {
 
     sf_free(ptr);
 
+    
+
     return EXIT_SUCCESS;
 }
