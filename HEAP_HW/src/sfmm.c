@@ -11,10 +11,8 @@
 
 void *sf_malloc(size_t size)
 {
-    sf_set_magic(0);       // DEBUG
-    size_t asize;          /* adjusted block size*/
-    size_t extendsize;     /* adjust to extend heap if no fit*/
-    size_t allocated_size; /*total allocated size of the heap*/
+    size_t asize;      /* adjusted block size*/
+    size_t extendsize; /* adjust to extend heap if no fit*/
     sf_block *blockp = NULL;
     // ignore spurious requests
     if (size == 0)
@@ -35,8 +33,10 @@ void *sf_malloc(size_t size)
     /*search the free list for a fit*/
     if ((blockp = find_fit(asize)) != NULL)
     {
-        place(blockp, asize, size);
-        return (void *)blockp;
+        header_t h = parse_header(blockp->header);
+        blockp = place(blockp, asize, size);
+        h = parse_header(blockp->header);
+        return (void *)(blockp) + 8;
     }
     size_t sizecurr = 0L;
     /*if no fit found, try to grow heap */
@@ -47,16 +47,21 @@ void *sf_malloc(size_t size)
         {
             return NULL;
         }
-        size += PAGE_SZ;
-    } while (size < extendsize);
-    place(blockp, asize, size);
+        sizecurr += PAGE_SZ;
+    } while (sizecurr < extendsize);
 
-    abort();
+    void *out = (void *)place(blockp, asize, size) + 8;
+    return out;
 }
 
 void sf_free(void *pp)
 {
-    // To be implemented
+    /** ignore out of bounds requests */
+    if (pp == NULL || pp < sf_mem_start() + ALIGNMENT_SIZE || pp >= sf_mem_end() - RSIZE){
+        abort()
+    }
+    sf_block *block = (sf_block *)(pp - RSIZE);
+
     abort();
 }
 
