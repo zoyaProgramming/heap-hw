@@ -8,6 +8,7 @@
 #define RSIZE 8           /* row size in bytes = 2 * 4*/
 #define WSIZE 2           /*1 word in bytes*/
 #define MIN_BLOCK_SIZE 32 /* 1 row header, 1 row */
+#define MAX_QLIST_SIZE 208
 
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 
@@ -18,29 +19,28 @@
 #define GET(p) (*(uint64_t *)(p))
 #define PUT(p, val) (*(uint64_t *)(p) = (val))
 
+/** helper to get the block ptr to a */
+
 /**Create a bitmask with LEN 1s, starting OFF bits from the right */
 #define BITMASK(off, len) ((((0x1UL << len) - 1) << off))
 
 /*helpers to get payload size or block size*/
-#define GET_PSIZE(p) (GET(p) & ~0xFFFFFFFF)
-#define GET_BSIZE(p) (GET(p) & 0xFFFFFFF0)
-#define GET_ALLOC(p) (GET(p) & 0x1)
+#define GET_PSIZE(p) ((GET(p)) & BITMASK(32, 32))
+#define GET_BSIZE(p) ((GET(p)) & 0xFFFFFFF0UL)
+#define GET_ALLOC(p) ((GET(p)) & 0x1)
 
 /**helpers to put byte / payload size */
 /**put the payload size into 64-bit value at ptr  */
-#define PUT_PSIZE(ptr, psize) (PUT(ptr, (GET(ptr) & ~(BITMASK(32, 32))) | ((uint64_t)(psize) << 32)))
+#define PUT_PSIZE(ptr, psize) (PUT(ptr, ((GET(ptr) & (BITMASK(0, 32))) | ((uint64_t)(psize) << 32))))
 /**put the byte size into the 64-bit value at ptr */
-#define PUT_BSIZE(ptr, bsize) (PUT(ptr, (GET(ptr) & ~(BITMASK(4, 28))) | (bsize << 4)))
-#define PUT_QLIST(ptr, bit) (PUT(ptr, ((GET(ptr) & ~(BITMASK(1, 1))) | (bit << 1))))
-#define PUT_ALLOC(ptr, bit) (PUT(ptr, ((GET(ptr) & ~(BITMASK(0, 1))) | (bit))))
+#define PUT_BSIZE(ptr, bsize) (PUT(ptr, ((GET(ptr) & ~(BITMASK(4, 28))) | (bsize))))
 
-/*given a block ptr blockp, compute address of hdr and footr*/
-#define HDRP(blockp) ((char *)(blockp))
-#define FTRP(blockp) ((char *)(blockp) + GET_BSIZE(HDRP(blockp)) - RSIZE)
+#define PUT_QLIST(ptr, bit) (PUT(ptr, ((GET(ptr) & ~(0x2LU)) | (bit << 1))))
+#define PUT_ALLOC(ptr, bit) (PUT(ptr, ((GET(ptr) & ~(0x1)) | (bit))))
 
 /*given a block ptr blockp, compute address of next and prev blocks*/
-#define NEXT_BLKP(blockp) ((char *)(blockp) + GET_BSIZE((char *)(blockp)))
-#define PREV_BLKP(blockp) ((char *)(blockp) - GET_BSIZE((char *)(blockp) - RSIZE))
+#define NEXT_BLKP(blockp, blk_size) ((void *)(blockp) + blk_size)
+#define PREV_BLKP(blockp, blk_size) ((void *)(blockp) - (blk_size))
 
 /*
  * "Quick lists":  These are used to hold recently freed blocks of small sizes, so that they
@@ -66,20 +66,27 @@ typedef struct header_t
     bool alloc;
 } header_t;
 
+/*given a block ptr blockp, compute address of hdr and footr*/
+#define HDRP(blockp) ((char *)(blockp))
+#define FTRP(blockp, blk_size) ((void *)(blockp) + blk_size - RSIZE)
 /**
  * Return the first free sf_block of a certain size
  * @param size: size of the block to access
  **/
-sf_block *fetch_from_ql(size_t size);
-
 sf_block *sf_mem_grow_safe();
 
 /**
  * Parse the header.
  * @param
  */
+
 header_t parse_header(sf_header header);
 
+/**
+ * @brief write the header
+ *
+ */
+void write_hdr(void *ptr, header_t header);
 /**
  * Find the first block with enough space to allocate a block of a certain size
  * @param size: the size of the block
@@ -109,5 +116,27 @@ sf_block *coalesce(sf_block *blockp);
  * @param size  size of the payload (user input provided)
  */
 sf_block *place(void *ptr, size_t asize, size_t size);
+void print_binary(uint64_t num);
+
+/**
+ * @brief find the idx of the size class that a certain size fits into (in the main free list)
+ * @param size: size of the free block for which you are determining the size class
+ * @return the index of the proper free list for the size
+ */
+int size_class(size_t size);
+
+/** @brief determine whether a ptr is valid
+ * false if :
+ * The pointer is NULL.
+ * The pointer is not 16-byte aligned
+ * After XOR'ing the stored header with MAGIC
+ *  The block size is less than the minimum block size of 32.
+ *  The block size is not a multiple of 16
+ *  The header of the block is before the start of the first block of the heap, or the footer of the block is after the end of the last block in the heap.
+ *  The allocated bit in the header is 0, or the in quick list bit in the header is 1.
+ */
+bool validptr(void *ptr);
+
+sf_block *split(sf_block *ptr, size_t asize, size_t size);
 
 #endif
