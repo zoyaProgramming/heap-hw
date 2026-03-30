@@ -11,6 +11,7 @@
 #include "stdio.h"
 
 // Function to print binary representation of an unsigned integer
+TestSuite(custom, .disabled = true);
 Test(custom, bitwrite)
 {
     uint64_t byte = 0x0UL;

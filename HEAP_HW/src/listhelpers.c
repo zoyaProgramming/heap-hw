@@ -77,7 +77,6 @@ void free_list_push(sf_block *block)
   int idx = size_class(hdr.block_size);
   sf_block *sentinel = sf_free_list_heads + idx;
   sf_block *old_first = sentinel->body.links.next;
-  int was_empty = (old_first == sentinel);
   block->body.links.prev = sentinel;
   block->body.links.next = old_first;
   sentinel->body.links.next = block;

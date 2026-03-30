@@ -18,11 +18,17 @@ sf_block *ql_pop(int idx);
 void *ql_push(sf_block *b);
 
 /**
- * @brief helpers related to main free lists
- * @def free_list_remove: remove a specific block from its free list
- * @def free_list_push: push a block to the start of the idx free list
+ * @brief remove a specific block from its free list
+ * @note post: links to the current node in the previous and next node have been removed and current block links are NULL
  */
 sf_block *free_list_remove(sf_block *block);
+
+/**
+ * @brief append block to the start of the free list
+ *
+ * @param block An sf_block with an updated, accurate header.
+ * @note postcondition: the links in the free-list have been updated so block is the next after the head
+ */
 void free_list_push(sf_block *block);
 
 #endif

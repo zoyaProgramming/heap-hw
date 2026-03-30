@@ -19,8 +19,6 @@
 #define GET(p) (*(uint64_t *)(p))
 #define PUT(p, val) (*(uint64_t *)(p) = (val))
 
-/** helper to get the block ptr to a */
-
 /**Create a bitmask with LEN 1s, starting OFF bits from the right */
 #define BITMASK(off, len) ((((0x1UL << len) - 1) << off))
 
@@ -42,21 +40,10 @@
 #define NEXT_BLKP(blockp, blk_size) ((void *)(blockp) + blk_size)
 #define PREV_BLKP(blockp, blk_size) ((void *)(blockp) - (blk_size))
 
-/*
- * "Quick lists":  These are used to hold recently freed blocks of small sizes, so that they
- * can be used to satisfy allocations without searching lists or splitting blocks.
- * Blocks on a quick list are marked as allocated, so they are not available for coalescing.
- * The number of blocks in any individual quick list is limited to QUICK_LIST_MAX.
- * If adding a block to a quick list would cause it to exceed QUICK_LIST_MAX, then the
- * list is flushed, returning the existing blocks in the list to the main pool, and then
- * the block being freed is added to the now-empty list, leaving that list containing one block.
- *
- * The quick lists are indexed by (size-MIN_BLOCK_SIZE)/ALIGN_SIZE, starting with blocks of the
- * minimum block size at index 0, blocks of size MIN_BLOCK_SIZE+ALIGN_SIZE at index 1, and so on.
- * They are maintained as singly linked lists, using a LIFO discipline.
- */
-
-/* Type with information about a block
+/*A variable to record max payload*/
+extern uint64_t aggregate_payload;
+extern uint64_t max_aggregate_payload;
+/* Type with information about a block header
  */
 typedef struct header_t
 {
@@ -65,7 +52,6 @@ typedef struct header_t
     bool in_qklst;
     bool alloc;
 } header_t;
-
 /*given a block ptr blockp, compute address of hdr and footr*/
 #define HDRP(blockp) ((char *)(blockp))
 #define FTRP(blockp, blk_size) ((void *)(blockp) + blk_size - RSIZE)
@@ -76,39 +62,41 @@ typedef struct header_t
 sf_block *sf_mem_grow_safe();
 
 /**
- * Parse the header.
- * @param
+ * Parse the header's raw data, including block size, payload, and whether or not it is allocated/in quicklist.
+ * Unobfuscates data by XOR with MAGIC.
+ * @param header the 64-bit unsigned raw header, obfuscated by MAGIC
  */
-
 header_t parse_header(sf_header header);
 
 /**
- * @brief write the header
- *
+ * @brief Write 64-bit header data to a location. After computing the 64-bit data from the input,
+ * obfuscates and sets the ptr to the new 64-bit header.
  */
 void write_hdr(void *ptr, header_t header);
+
 /**
  * Find the first block with enough space to allocate a block of a certain size
+ * Uses a first-fit policy
  * @param size: the size of the block
  */
 sf_block *find_fit(size_t size);
 
 /**
  * Initialize the memory with one page. Create 32-bit prologue and 8-bit epilogue
- * @return: pointer to the first block of the allocated memory
- */
+ * @return: pointer to the first block of the allocated memory */
 sf_block *mem_init();
 
 /**
- * grow memory and coalesce with the preceding block
- * @return ptr to the coalesced block
- */
+ * coalesce block with any blocks left or right of it
+ *
+ * @note DOES NOT remove block from free list
+ * @note left and right blocks are removed from free list
+ * @return ptr to the coalesced block, still in free list*/
 sf_block *coalesce(sf_block *blockp);
 
 /**
  * @brief given a pointer to valid memory of the desired size,
  *          set the hdr and footer of the memory block, and return a ptr to the block.
- *
  *          If there is enough space to split the block into 2 blocks, do so and add padding.
  *          Also remove the block from the free list, and quick list if applicable.
  * @param ptr ptr to the location in memory
@@ -116,6 +104,8 @@ sf_block *coalesce(sf_block *blockp);
  * @param size  size of the payload (user input provided)
  */
 sf_block *place(void *ptr, size_t asize, size_t size);
+
+/*Helper function to print a number's binary value*/
 void print_binary(uint64_t num);
 
 /**
@@ -137,6 +127,7 @@ int size_class(size_t size);
  */
 bool validptr(void *ptr);
 
+/** */
 sf_block *split(sf_block *ptr, size_t asize, size_t size);
 
 #endif

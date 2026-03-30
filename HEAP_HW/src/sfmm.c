@@ -38,9 +38,7 @@ void *sf_malloc(size_t size)
     /*search the free list for a fit*/
     if ((blockp = find_fit(asize)) != NULL)
     {
-        header_t h = parse_header(blockp->header);
         blockp = place(blockp, asize, size);
-        h = parse_header(blockp->header);
 
         aggregate_payload += size;
         max_aggregate_payload = MAX(aggregate_payload, max_aggregate_payload);
@@ -111,8 +109,7 @@ void sf_free(void *pp)
         new_hdr.payload_size = 0;
 
         write_hdr(FTRP(new_ptr, new_hdr.block_size), new_hdr);
-        header_t ftr_size = parse_header(((sf_block *)FTRP(new_ptr, new_hdr.block_size))->header);
-        int idx = size_class(new_hdr.block_size);
+
         free_list_push(new_ptr);
     }
     aggregate_payload -= old_payload_size;
@@ -133,15 +130,15 @@ void *sf_realloc(void *pp, size_t rsize)
         sf_free(pp);
         return NULL;
     }
-    /**
+
     /*Case 1 : Reallocating to a larger size block: call malloc and memcpy*/
-    if (rsize > hdr.block_size) /**/
+    if (rsize > hdr.block_size)
     {
         void *new_block = sf_malloc(rsize);
         if (!new_block)
             return NULL;
 
-        memcpy(new_block, pp, hdr.payload_size); /*copy payload to the new block*/
+        new_block = memcpy(new_block, pp, hdr.payload_size); /*copy payload to the new block*/
         sf_free(pp);
         return new_block;
     }
@@ -152,7 +149,7 @@ void *sf_realloc(void *pp, size_t rsize)
 
         if (hdr.block_size - asize >= 32) /*original block big enough to split into 2 blocks*/
         {
-            void *new_block = (void *)split(block, asize, rsize);
+            split(block, asize, rsize);
 
             aggregate_payload -= hdr.payload_size;
             aggregate_payload += rsize;

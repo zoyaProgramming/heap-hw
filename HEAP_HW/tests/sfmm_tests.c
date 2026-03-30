@@ -269,7 +269,7 @@ Test(sfmm_student_suite, student_test_2, .timeout = TEST_TIMEOUT)
 {
 	void *x = sf_malloc(16); // size32
 	void *y = sf_malloc(16);
-	void *z = sf_malloc(16); // [prologue: 40 bytes][x.hdr + x: 32 bytes][y.hdr + y: 32 bytes][y.hdr + y: 32 bytes][free: 3952]
+	/*void *z = */ sf_malloc(16); // [prologue: 40 bytes][x.hdr + x: 32 bytes][y.hdr + y: 32 bytes][y.hdr + y: 32 bytes][free: 3952]
 
 	assert_free_block_count(3952, 1);
 	/* free up a 64 byte block counting overhead*/
@@ -289,7 +289,7 @@ Test(sfmm_student_suite, student_test_3, .timeout = TEST_TIMEOUT)
 {
 	void *x = sf_malloc(208); /*too big for QL*/
 	void *y = sf_malloc(208);
-	void *z = sf_malloc(224);
+	/*void *z = */ sf_malloc(224);
 	sf_free(x);
 	sf_free(y);
 
@@ -340,6 +340,6 @@ Test(sfmm_student_suite, student_test_5, .timeout = TEST_TIMEOUT)
 	sf_free(e);
 
 	assert_quick_list_block_count(32, 5); /*full capacity*/
-	sf_free(f); /* flush*/
+	sf_free(f);														/* flush*/
 	assert_quick_list_block_count(32, 1);
 }
