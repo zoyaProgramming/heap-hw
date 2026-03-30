@@ -25,6 +25,7 @@ void *sf_malloc(size_t size)
         asize = MIN_BLOCK_SIZE;
     else
         asize = ALIGNMENT_SIZE * ((size + ALIGNMENT_SIZE + (ALIGNMENT_SIZE - 1)) / ALIGNMENT_SIZE);
+
     /*initialize heap if not initialized already*/
     if (sf_mem_end() - sf_mem_start() < 32)
     {
@@ -100,14 +101,15 @@ void sf_free(void *pp)
             .in_qklst = 0,
             .payload_size = 0};
         write_hdr(block, header);
+        write_hdr(FTRP(block, header.block_size), header);
         sf_block *new_ptr = coalesce(block);
-
         header_t new_hdr = parse_header(new_ptr->header);
 
         new_hdr.alloc = 0;
         new_hdr.in_qklst = 0;
         new_hdr.payload_size = 0;
 
+        write_hdr(new_ptr, new_hdr);
         write_hdr(FTRP(new_ptr, new_hdr.block_size), new_hdr);
 
         free_list_push(new_ptr);
@@ -186,16 +188,18 @@ double sf_fragmentation()
     if (epilogue - mem_start <= 48 + 32)
         return 0.0;
 
+
     while ((void *)curr < epilogue)
     {
         header_t header = parse_header(curr->header);
-        if (header.alloc)
+        if (header.alloc && !header.in_qklst)
         {
             total_payload += (double)(header.payload_size);
             total_size += (double)(header.block_size);
         }
         curr = NEXT_BLKP(curr, header.block_size);
     }
+    debug("%lf %lf ", total_payload, total_size);
     return total_payload / total_size;
 }
 

@@ -66,10 +66,11 @@ bool validptr(void *ptr)
     header_t hdr = parse_header(*header_ptr);
     if ((hdr.block_size < 32) ||
         (hdr.block_size % 16 != 0) ||
-        (hdr.block_size + ptr > (sf_mem_end() - RSIZE)) ||
+        (hdr.block_size + ptr > sf_mem_end()) ||
         (hdr.alloc == 0) ||
         (hdr.in_qklst == 1))
     {
+
         return false;
     }
     return true;

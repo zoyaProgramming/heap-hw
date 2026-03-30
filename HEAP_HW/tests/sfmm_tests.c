@@ -258,14 +258,14 @@ Test(sfmm_basecode_suite, realloc_smaller_block_free_block, .timeout = TEST_TIME
 // DO NOT DELETE OR MANGLE THESE COMMENTS
 // ############################################
 
-Test(sfmm_student_suite, student_test_1, .timeout = TEST_TIMEOUT)
+Test(sfmm_student_suite, test_fragmentation, .timeout = TEST_TIMEOUT)
 {
 	sf_malloc(16);
 	double fragmentation = sf_fragmentation();
 	cr_assert_eq(sf_fragmentation(), 0.5, "Error: expected fragmentation %lf got %lf.", 0.5, fragmentation);
 }
 
-Test(sfmm_student_suite, student_test_2, .timeout = TEST_TIMEOUT)
+Test(sfmm_student_suite, test_basic, .timeout = TEST_TIMEOUT)
 {
 	void *x = sf_malloc(16); // size32
 	void *y = sf_malloc(16);
@@ -285,7 +285,7 @@ Test(sfmm_student_suite, student_test_2, .timeout = TEST_TIMEOUT)
 	assert_free_block_count(32, 0);
 }
 /*test coalescing behavior*/
-Test(sfmm_student_suite, student_test_3, .timeout = TEST_TIMEOUT)
+Test(sfmm_student_suite, test_coalesce, .timeout = TEST_TIMEOUT)
 {
 	void *x = sf_malloc(208); /*too big for QL*/
 	void *y = sf_malloc(208);
@@ -298,7 +298,7 @@ Test(sfmm_student_suite, student_test_3, .timeout = TEST_TIMEOUT)
 }
 
 /*test sf utilization*/
-Test(sfmm_student_suite, student_test_4, .timeout = TEST_TIMEOUT)
+Test(sfmm_student_suite, test_peak_utilization, .timeout = TEST_TIMEOUT)
 {
 	void *x = sf_malloc(208); /*too big for QL*/
 	void *y = sf_malloc(208);
@@ -317,14 +317,13 @@ Test(sfmm_student_suite, student_test_4, .timeout = TEST_TIMEOUT)
 	sf_free(z);
 	cr_assert_eq(sf_utilization(), (224.0 + 4096.0) / 8192.0);
 
-	sf_show_blocks();
 	sf_realloc(v, 2000);
 
 	assert_quick_list_block_count(224, 0);
 }
 
 /*Test large amounts of frees */
-Test(sfmm_student_suite, student_test_5, .timeout = TEST_TIMEOUT)
+Test(sfmm_student_suite, test_sf_flush, .timeout = TEST_TIMEOUT)
 {
 	void *a = sf_malloc(16);
 	void *b = sf_malloc(16);
@@ -342,4 +341,142 @@ Test(sfmm_student_suite, student_test_5, .timeout = TEST_TIMEOUT)
 	assert_quick_list_block_count(32, 5); /*full capacity*/
 	sf_free(f);														/* flush*/
 	assert_quick_list_block_count(32, 1);
+}
+/*test min. split boundary*/
+Test(sfmm_student_suite, split_test, .timeout = TEST_TIMEOUT)
+{
+	void *x = sf_malloc(4032); /*s*/
+	sf_free(x);
+	assert_free_block_count(4048, 1);
+	sf_malloc(4032 - 32); /*allocate with 32 bytes remaining*/
+	assert_free_block_count(4016, 0);
+	assert_free_block_count(32, 1); /*shouldn't go in quick list*/
+}
+/* LIFO test*/
+Test(sfmm_student_suite, quick_list_lifo_order, .timeout = TEST_TIMEOUT)
+{
+	sf_errno = 0;
+
+	void *a = sf_malloc(1); // adjusted size 32
+	void *b = sf_malloc(1); // adjusted size 32
+	cr_assert_not_null(a);
+	cr_assert_not_null(b);
+
+	sf_free(a);
+	sf_free(b);
+
+	// Quick list should be LIFO: b then a
+	void *x = sf_malloc(1);
+	void *y = sf_malloc(1);
+
+	cr_assert_eq(x, b, "Expected first quick-list reuse to return most recently freed block");
+	cr_assert_eq(y, a, "Expected second quick-list reuse to return older freed block");
+}
+
+Test(sfmm_student_suite, quick_list_flush_on_sixth_insert, .timeout = TEST_TIMEOUT)
+{
+	sf_errno = 0;
+
+	void *q[6];
+	void *guard[6];
+
+	// Separate quick-list candidates so flushed blocks cannot coalesce together.
+	for (int i = 0; i < 6; i++)
+	{
+		q[i] = sf_malloc(1);			 // size class 32
+		guard[i] = sf_malloc(200); // non-quick allocated spacer
+		cr_assert_not_null(q[i]);
+		cr_assert_not_null(guard[i]);
+	}
+
+	for (int i = 0; i < 6; i++)
+	{
+		sf_free(q[i]);
+	}
+
+	// With QUICK_LIST_MAX = 5:
+	// freeing the 6th block flushes prior 5 to main free list, then inserts newest in quick list.
+	assert_quick_list_block_count(32, 1);
+	assert_free_block_count(32, 5);
+}
+
+Test(sfmm_student_suite, realloc_splinter_does_not_split, .timeout = TEST_TIMEOUT)
+{
+	sf_errno = 0;
+
+	void *x = sf_malloc(40); // adjusted size should be 64
+	void *guard = sf_malloc(200);
+	cr_assert_not_null(x);
+	cr_assert_not_null(guard);
+
+	void *y = sf_realloc(x, 24); // adjusted size 48, splinter 16 -> should NOT split
+	cr_assert_not_null(y);
+	cr_assert_eq(y, x, "Realloc shrinking with splinter should keep same payload pointer");
+
+	sf_block *bp = (sf_block *)((char *)y - 8);
+	size_t bsize = (bp->header ^ sf_magic()) & ~0xffffffff0000000f;
+	cr_assert_eq(bsize, 64, "Block should remain 64 bytes when remainder would be splinter");
+}
+
+Test(sfmm_student_suite, realloc_exact_min_split_creates_free_32, .timeout = TEST_TIMEOUT)
+{
+	sf_errno = 0;
+
+	void *x = sf_malloc(40); // adjusted size 64
+	void *guard = sf_malloc(200);
+	cr_assert_not_null(x);
+	cr_assert_not_null(guard);
+
+	void *y = sf_realloc(x, 8); // adjusted size 32, remainder exactly 32 -> split expected
+	cr_assert_not_null(y);
+	cr_assert_eq(y, x, "Realloc shrink should keep same payload pointer");
+
+	sf_block *bp = (sf_block *)((char *)y - 8);
+	size_t bsize = (bp->header ^ sf_magic()) & ~0xffffffff0000000f;
+	cr_assert_eq(bsize, 32, "Realloc should shrink block to 32 when exact minimum split is possible");
+
+	assert_free_block_count(32, 1);
+}
+
+Test(sfmm_student_suite, free_invalid_pointer_aborts, .signal = SIGABRT)
+{
+	void *x = sf_malloc(8);
+	cr_assert_not_null(x);
+
+	// Deliberately invalid (unaligned / not block payload start)
+	sf_free((char *)x + 1);
+}
+
+Test(sfmm_student_suite, fragmentation_single_alloc, .timeout = TEST_TIMEOUT)
+{
+	void *p = sf_malloc(8); // block size 32
+	cr_assert_not_null(p);
+	cr_assert_eq(sf_fragmentation(), (8.0) / (32.0));
+}
+
+Test(sfmm_student_suite, fragmentation_multiple_allocs, .timeout = TEST_TIMEOUT)
+{
+	void *a = sf_malloc(8);		// bsize 32
+	void *b = sf_malloc(200); // 224 block size, after rounding up
+	void *c = sf_malloc(1);
+
+	cr_assert_not_null(a);
+	cr_assert_not_null(b);
+	cr_assert_not_null(c);
+
+	debug("%lf %lf", sf_fragmentation(), (8.0 + 200.0 + 1.0) / (32.0 + 224.0 + 32.0));
+	cr_assert_eq(sf_fragmentation(), (8.0 + 200.0 + 1.0) / (32.0 + 224.0 + 32.0));
+}
+/*test whether the fragmentation fucntion ignores quicklist blocks*/
+Test(sfmm_student_suite, fragmentation_ignores_freed_ql_blocks, .timeout = TEST_TIMEOUT)
+{
+	void *a = sf_malloc(8);		// blocksize 32
+	void *b = sf_malloc(200); // blocksize 224
+	void *c = sf_malloc(1);		// blocksize 32
+	sf_free(c);//goes to ql
+	
+	cr_assert_not_null(a);
+	cr_assert_not_null(b);
+	cr_assert_not_null(c);
+	cr_assert_eq(sf_fragmentation(), 208.0 / 256.0);
 }
