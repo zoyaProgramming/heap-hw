@@ -1,12 +1,3 @@
-CPU := $(shell uname -p)
-ifeq ($(CPU),arm)
-export LD_LIBRARY_PATH=/opt/homebrew/lib/:$LD_LIBRARY_PATH
-INCD = -I /opt/homebrew/include/
-LIBD = -L /opt/homebrew/lib/
-endif
-
-
-
 CC := gcc
 SRCD := src
 TSTD := tests
@@ -24,7 +15,7 @@ TEST_SRC := $(shell find $(TSTD) -type f -name *.c)
 
 INC := -I $(INCD)
 
-CFLAGS := -fcommon -Wall  -Wno-unused-function -MMD
+CFLAGS := -fcommon -Wall -Werror -Wno-unused-function -MMD
 COLORF := -DCOLOR
 DFLAGS := -g -DDEBUG -DCOLOR # -DWEAK_MAGIC
 PRINT_STAMENTS := -DERROR -DSUCCESS -DWARN -DINFO
